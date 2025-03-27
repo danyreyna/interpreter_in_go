@@ -111,7 +111,7 @@ func TestGetNextToken(t *testing.T) {
 
 		if currentToken.kind != currentTest.expectedKind {
 			t.Fatalf(
-				"tests[%d] — kind is wrong. expected=%q, got=%q",
+				"tests[%d] — kind is wrong. expected=%d, got=%d",
 				i,
 				currentTest.expectedKind,
 				currentToken.kind,
