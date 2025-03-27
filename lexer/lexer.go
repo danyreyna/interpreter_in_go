@@ -2,6 +2,7 @@ package lexer
 
 import (
 	"bufio"
+	"interpreter_in_go/common"
 	"os"
 )
 
@@ -14,15 +15,9 @@ type Lexer struct {
 	currentColumnNumber int
 }
 
-func check(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
-
 func newLexer(filePath string) *Lexer {
 	file, err := os.Open(filePath)
-	check(err)
+	common.Check(err)
 
 	fileReader := bufio.NewReader(file)
 
@@ -56,10 +51,10 @@ func (lexerInstance *Lexer) updateCurrentCodePoint() {
 
 func (lexerInstance *Lexer) peekAtNextCodePoint() rune {
 	codePoint, _, readErr := lexerInstance.fileReader.ReadRune()
-	check(readErr)
+	common.Check(readErr)
 
 	unreadErr := lexerInstance.fileReader.UnreadRune()
-	check(unreadErr)
+	common.Check(unreadErr)
 
 	return codePoint
 }
@@ -222,7 +217,7 @@ func (lexerInstance *Lexer) handleSingleCodePoint(codePoint rune, lineNumber int
 
 	case 0:
 		err := lexerInstance.file.Close()
-		check(err)
+		common.Check(err)
 		return token{kind: eof, filePath: lexerInstance.filePath, lineNumber: lineNumber, columnNumber: columnNumber}
 	default:
 		return token{unknown, string(codePoint), lexerInstance.filePath, lineNumber, columnNumber}
