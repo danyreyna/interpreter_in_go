@@ -7,3 +7,5 @@ let add = fn(x, y) {
 };
 
 let result = add(five, ten);
+let 犬の数 = 5;
+let 猫的数量 = 2;

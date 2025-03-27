@@ -54,7 +54,17 @@ func TestGetNextToken(t *testing.T) {
 		{identifier, "ten", "./test-file.code", 9, 24},
 		{rightParenthesis, "", "./test-file.code", 9, 27},
 		{semicolon, "", "./test-file.code", 9, 28},
-		{eof, "", "./test-file.code", 10, 1},
+		{let, "", "./test-file.code", 10, 1},
+		{identifier, "犬の数", "./test-file.code", 10, 5},
+		{assign, "", "./test-file.code", 10, 9},
+		{integer, "5", "./test-file.code", 10, 11},
+		{semicolon, "", "./test-file.code", 10, 12},
+		{let, "", "./test-file.code", 11, 1},
+		{identifier, "猫的数量", "./test-file.code", 11, 5},
+		{assign, "", "./test-file.code", 11, 10},
+		{integer, "2", "./test-file.code", 11, 12},
+		{semicolon, "", "./test-file.code", 11, 13},
+		{eof, "", "./test-file.code", 12, 1},
 	}
 
 	lexerInstance := newLexer("./test-file.code")

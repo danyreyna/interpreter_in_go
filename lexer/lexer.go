@@ -9,7 +9,7 @@ type Lexer struct {
 	file                *os.File
 	fileReader          *bufio.Reader
 	filePath            string
-	currentCharacter    byte
+	currentCodePoint    rune
 	currentLineNumber   int
 	currentColumnNumber int
 }
@@ -26,18 +26,18 @@ func newLexer(filePath string) *Lexer {
 
 	fileReader := bufio.NewReader(file)
 
-	var currentCharacter byte
-	if character, err := fileReader.ReadByte(); err == nil {
-		currentCharacter = character
+	var currentCodePoint rune
+	if codePoint, _, err := fileReader.ReadRune(); err == nil {
+		currentCodePoint = codePoint
 	} else {
-		currentCharacter = 0
+		currentCodePoint = 0
 	}
 
 	lexerInstance := &Lexer{
 		file,
 		fileReader,
 		filePath,
-		currentCharacter,
+		currentCodePoint,
 		1,
 		1,
 	}
@@ -45,74 +45,87 @@ func newLexer(filePath string) *Lexer {
 	return lexerInstance
 }
 
-func (lexerInstance *Lexer) updateCurrentCharacter() {
-	if character, err := lexerInstance.fileReader.ReadByte(); err == nil {
-		lexerInstance.currentCharacter = character
+func (lexerInstance *Lexer) updateCurrentCodePoint() {
+	if codePoint, _, err := lexerInstance.fileReader.ReadRune(); err == nil {
+		lexerInstance.currentCodePoint = codePoint
 		return
 	}
 
-	lexerInstance.currentCharacter = 0
+	lexerInstance.currentCodePoint = 0
 }
 
 func (lexerInstance *Lexer) skipWhitespace() {
-	for lexerInstance.currentCharacter == ' ' ||
-		lexerInstance.currentCharacter == '\t' ||
-		lexerInstance.currentCharacter == '\n' ||
-		lexerInstance.currentCharacter == '\r' {
-		if lexerInstance.currentCharacter == ' ' {
+	for lexerInstance.currentCodePoint == ' ' ||
+		lexerInstance.currentCodePoint == '\t' ||
+		lexerInstance.currentCodePoint == '\n' ||
+		lexerInstance.currentCodePoint == '\r' {
+		if lexerInstance.currentCodePoint == ' ' {
 			lexerInstance.currentColumnNumber += 1
 		}
-		if lexerInstance.currentCharacter == '\t' {
+		if lexerInstance.currentCodePoint == '\t' {
 			lexerInstance.currentColumnNumber += 4 - (lexerInstance.currentColumnNumber % 4)
 		}
-		if lexerInstance.currentCharacter == '\n' {
+		if lexerInstance.currentCodePoint == '\n' {
 			lexerInstance.currentLineNumber += 1
 			lexerInstance.currentColumnNumber = 1
 		}
 
-		lexerInstance.updateCurrentCharacter()
+		lexerInstance.updateCurrentCodePoint()
 	}
 }
 
-func (lexerInstance *Lexer) getMultiCharacterToken(isAllowedCharacter func(byte) bool) string {
-	var tokenSlice []byte
+func (lexerInstance *Lexer) getMultiCodePointToken(isAllowedCodePoint func(rune) bool) string {
+	var tokenSlice []rune
 
-	for isAllowedCharacter(lexerInstance.currentCharacter) {
-		tokenSlice = append(tokenSlice, lexerInstance.currentCharacter)
-		lexerInstance.updateCurrentCharacter()
+	for isAllowedCodePoint(lexerInstance.currentCodePoint) {
+		tokenSlice = append(tokenSlice, lexerInstance.currentCodePoint)
+		lexerInstance.updateCurrentCodePoint()
 	}
 
 	return string(tokenSlice)
 }
 
-func isLowerCase(character byte) bool {
-	return 'a' <= character && character <= 'z'
-}
-
-func isUpperCase(character byte) bool {
-	return 'A' <= character && character <= 'Z'
-}
-
-func isAlphabetical(character byte) bool {
-	return isLowerCase(character) || isUpperCase(character) || character == '_'
-}
-
-func (lexerInstance *Lexer) getWord() string {
-	return lexerInstance.getMultiCharacterToken(isAlphabetical)
-}
-
-func isNumeric(character byte) bool {
-	return '0' <= character && character <= '9'
+func isNumeric(codePoint rune) bool {
+	return '0' <= codePoint && codePoint <= '9'
 }
 
 func (lexerInstance *Lexer) getInteger() string {
-	return lexerInstance.getMultiCharacterToken(isNumeric)
+	return lexerInstance.getMultiCodePointToken(isNumeric)
+}
+
+func isPartOfWord(codePoint rune) bool {
+	excludedCodePoints := map[rune]struct{}{
+		' ':  {},
+		'\t': {},
+		'\n': {},
+		'\r': {},
+		'=':  {},
+		',':  {},
+		'{':  {},
+		'(':  {},
+		'+':  {},
+		'}':  {},
+		')':  {},
+		';':  {},
+		0:    {},
+	}
+
+	_, isExcludedCodePoint := excludedCodePoints[codePoint]
+	return !isExcludedCodePoint
+}
+
+func (lexerInstance *Lexer) getWord() string {
+	return lexerInstance.getMultiCodePointToken(isPartOfWord)
+}
+
+func isStartOfWord(codePoint rune) bool {
+	return isPartOfWord(codePoint) && !isNumeric(codePoint)
 }
 
 func (lexerInstance *Lexer) handleWordToken(lineNumber int, columnNumber int) token {
 	word := lexerInstance.getWord()
 
-	lexerInstance.currentColumnNumber += len(word)
+	lexerInstance.currentColumnNumber += len([]rune(word))
 
 	if _, isKeyword := keywords[word]; isKeyword {
 		return token{
@@ -146,14 +159,14 @@ func (lexerInstance *Lexer) handleNumberToken(lineNumber int, columnNumber int) 
 	}
 }
 
-func (lexerInstance *Lexer) handleSingleCodePoint(character byte, lineNumber int, columnNumber int) token {
-	if character != 0 {
+func (lexerInstance *Lexer) handleSingleCodePoint(codePoint rune, lineNumber int, columnNumber int) token {
+	if codePoint != 0 {
 		lexerInstance.currentColumnNumber += 1
 
-		lexerInstance.updateCurrentCharacter()
+		lexerInstance.updateCurrentCodePoint()
 	}
 
-	switch character {
+	switch codePoint {
 	case '=':
 		return token{kind: assign, filePath: lexerInstance.filePath, lineNumber: lineNumber, columnNumber: columnNumber}
 	case ',':
@@ -188,24 +201,24 @@ func (lexerInstance *Lexer) handleSingleCodePoint(character byte, lineNumber int
 		check(err)
 		return token{kind: eof, filePath: lexerInstance.filePath, lineNumber: lineNumber, columnNumber: columnNumber}
 	default:
-		return token{unknown, string(character), lexerInstance.filePath, lineNumber, columnNumber}
+		return token{unknown, string(codePoint), lexerInstance.filePath, lineNumber, columnNumber}
 	}
 }
 
 func (lexerInstance *Lexer) getNextToken() token {
 	lexerInstance.skipWhitespace()
 
-	character := lexerInstance.currentCharacter
+	codePoint := lexerInstance.currentCodePoint
 	lineNumber := lexerInstance.currentLineNumber
 	columnNumber := lexerInstance.currentColumnNumber
 
-	if isAlphabetical(character) {
+	if isStartOfWord(codePoint) {
 		return lexerInstance.handleWordToken(lineNumber, columnNumber)
 	}
 
-	if isNumeric(character) {
+	if isNumeric(codePoint) {
 		return lexerInstance.handleNumberToken(lineNumber, columnNumber)
 	}
 
-	return lexerInstance.handleSingleCodePoint(character, lineNumber, columnNumber)
+	return lexerInstance.handleSingleCodePoint(codePoint, lineNumber, columnNumber)
 }
