@@ -22,8 +22,10 @@ const (
 )
 
 type token struct {
-	kind    string
-	literal string
+	kind         string
+	literal      string
+	lineNumber   int
+	columnNumber int
 }
 
 var keywords = map[string]struct{}{

@@ -4,6 +4,8 @@ type Lexer struct {
 	codeString            string
 	currentCharacterIndex int
 	currentCharacter      byte
+	currentLineNumber     int
+	currentColumnNumber   int
 }
 
 func newLexer(codeString string) *Lexer {
@@ -18,6 +20,8 @@ func newLexer(codeString string) *Lexer {
 		codeString,
 		0,
 		currentCharacter,
+		1,
+		1,
 	}
 
 	return lexerInstance
@@ -38,6 +42,17 @@ func (lexerInstance *Lexer) skipWhitespace() {
 		lexerInstance.currentCharacter == '\t' ||
 		lexerInstance.currentCharacter == '\n' ||
 		lexerInstance.currentCharacter == '\r' {
+		if lexerInstance.currentCharacter == ' ' {
+			lexerInstance.currentColumnNumber += 1
+		}
+		if lexerInstance.currentCharacter == '\t' {
+			lexerInstance.currentColumnNumber += 4 - (lexerInstance.currentColumnNumber % 4)
+		}
+		if lexerInstance.currentCharacter == '\n' {
+			lexerInstance.currentLineNumber += 1
+			lexerInstance.currentColumnNumber = 1
+		}
+
 		lexerInstance.updateCurrentCharacter()
 	}
 }
@@ -76,46 +91,69 @@ func (lexerInstance *Lexer) getInteger() string {
 	return lexerInstance.getMultiCharacterToken(isNumeric)
 }
 
-func (lexerInstance *Lexer) handleWordToken() token {
+func (lexerInstance *Lexer) handleWordToken(lineNumber int, columnNumber int) token {
 	word := lexerInstance.getWord()
 
+	lexerInstance.currentColumnNumber += len(word)
+
 	if _, isKeyword := keywords[word]; isKeyword {
-		return token{kind: word}
+		return token{
+			kind:         word,
+			lineNumber:   lineNumber,
+			columnNumber: columnNumber,
+		}
 	}
 
-	return token{identifier, word}
+	return token{
+		identifier,
+		word,
+		lineNumber,
+		columnNumber,
+	}
 }
 
-func (lexerInstance *Lexer) handleNumberToken() token {
+func (lexerInstance *Lexer) handleNumberToken(lineNumber int, columnNumber int) token {
 	number := lexerInstance.getInteger()
-	return token{integer, number}
+
+	lexerInstance.currentColumnNumber += len(number)
+
+	return token{
+		integer,
+		number,
+		lineNumber,
+		columnNumber,
+	}
 }
 
-func (lexerInstance *Lexer) handleSingleCodePoint(character byte) token {
-	lexerInstance.updateCurrentCharacter()
+func (lexerInstance *Lexer) handleSingleCodePoint(character byte, lineNumber int, columnNumber int) token {
+	if character != 0 {
+		lexerInstance.currentColumnNumber += 1
+
+		lexerInstance.updateCurrentCharacter()
+	}
 
 	switch character {
 	case '=':
-		return token{kind: assign}
+		return token{kind: assign, lineNumber: lineNumber, columnNumber: columnNumber}
 	case ',':
-		return token{kind: comma}
+		return token{kind: comma, lineNumber: lineNumber, columnNumber: columnNumber}
 	case '{':
-		return token{kind: leftCurlyBrace}
+		return token{kind: leftCurlyBrace, lineNumber: lineNumber, columnNumber: columnNumber}
 	case '(':
-		return token{kind: leftParenthesis}
+		return token{kind: leftParenthesis, lineNumber: lineNumber, columnNumber: columnNumber}
 	case '+':
-		return token{kind: plus}
+		return token{kind: plus, lineNumber: lineNumber, columnNumber: columnNumber}
 	case '}':
-		return token{kind: rightCurlyBrace}
+		return token{kind: rightCurlyBrace, lineNumber: lineNumber, columnNumber: columnNumber}
 	case ')':
-		return token{kind: rightParenthesis}
+		return token{kind: rightParenthesis, lineNumber: lineNumber, columnNumber: columnNumber}
 	case ';':
-		return token{kind: semicolon}
+		return token{kind: semicolon, lineNumber: lineNumber, columnNumber: columnNumber}
 
 	case 0:
-		return token{kind: eof}
+		return token{kind: eof, lineNumber: lineNumber, columnNumber: columnNumber}
 	default:
-		return token{unknown, string(character)}
+		return token{unknown, string(character), lineNumber, columnNumber}
 	}
 }
 
@@ -123,14 +161,16 @@ func (lexerInstance *Lexer) getNextToken() token {
 	lexerInstance.skipWhitespace()
 
 	character := lexerInstance.currentCharacter
+	lineNumber := lexerInstance.currentLineNumber
+	columnNumber := lexerInstance.currentColumnNumber
 
 	if isAlphabetical(character) {
-		return lexerInstance.handleWordToken()
+		return lexerInstance.handleWordToken(lineNumber, columnNumber)
 	}
 
 	if isNumeric(character) {
-		return lexerInstance.handleNumberToken()
+		return lexerInstance.handleNumberToken(lineNumber, columnNumber)
 	}
 
-	return lexerInstance.handleSingleCodePoint(character)
+	return lexerInstance.handleSingleCodePoint(character, lineNumber, columnNumber)
 }
