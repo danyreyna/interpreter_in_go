@@ -4,7 +4,7 @@ import "testing"
 
 func TestGetNextToken(t *testing.T) {
 	tests := []struct {
-		expectedKind         string
+		expectedKind         byte
 		expectedLiteral      string
 		expectedFilePath     string
 		expectedLineNumber   int

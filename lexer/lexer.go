@@ -127,9 +127,9 @@ func (lexerInstance *Lexer) handleWordToken(lineNumber int, columnNumber int) to
 
 	lexerInstance.currentColumnNumber += len([]rune(word))
 
-	if _, isKeyword := keywords[word]; isKeyword {
+	if keywordValue, isKeyword := keywords[word]; isKeyword {
 		return token{
-			kind:         word,
+			kind:         keywordValue,
 			filePath:     lexerInstance.filePath,
 			lineNumber:   lineNumber,
 			columnNumber: columnNumber,

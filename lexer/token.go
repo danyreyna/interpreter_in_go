@@ -1,35 +1,35 @@
 package lexer
 
 const (
-	fn  = "fn"
-	let = "let"
+	fn  = byte(0)
+	let = byte(1)
 
-	identifier = "identifier"
+	identifier = byte(2)
 
-	integer = "int"
+	integer = byte(3)
 
-	assign           = "="
-	comma            = ","
-	leftCurlyBrace   = "{"
-	leftParenthesis  = "("
-	plus             = "+"
-	rightCurlyBrace  = "}"
-	rightParenthesis = ")"
-	semicolon        = ";"
+	assign           = byte(4)
+	comma            = byte(5)
+	leftCurlyBrace   = byte(6)
+	leftParenthesis  = byte(7)
+	plus             = byte(8)
+	rightCurlyBrace  = byte(9)
+	rightParenthesis = byte(10)
+	semicolon        = byte(11)
 
-	eof     = "eof"
-	unknown = "unknown"
+	eof     = byte(12)
+	unknown = byte(13)
 )
 
 type token struct {
-	kind         string
+	kind         byte
 	literal      string
 	filePath     string
 	lineNumber   int
 	columnNumber int
 }
 
-var keywords = map[string]struct{}{
-	fn:  {},
-	let: {},
+var keywords = map[string]byte{
+	"fn":  fn,
+	"let": let,
 }
