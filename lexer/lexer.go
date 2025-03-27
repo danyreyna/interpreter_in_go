@@ -1,24 +1,42 @@
 package lexer
 
+import (
+	"bufio"
+	"os"
+)
+
 type Lexer struct {
-	codeString            string
-	currentCharacterIndex int
-	currentCharacter      byte
-	currentLineNumber     int
-	currentColumnNumber   int
+	file                *os.File
+	fileReader          *bufio.Reader
+	filePath            string
+	currentCharacter    byte
+	currentLineNumber   int
+	currentColumnNumber int
 }
 
-func newLexer(codeString string) *Lexer {
+func check(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
+func newLexer(filePath string) *Lexer {
+	file, err := os.Open(filePath)
+	check(err)
+
+	fileReader := bufio.NewReader(file)
+
 	var currentCharacter byte
-	if len(codeString) == 0 {
-		currentCharacter = 0
+	if character, err := fileReader.ReadByte(); err == nil {
+		currentCharacter = character
 	} else {
-		currentCharacter = codeString[0]
+		currentCharacter = 0
 	}
 
 	lexerInstance := &Lexer{
-		codeString,
-		0,
+		file,
+		fileReader,
+		filePath,
 		currentCharacter,
 		1,
 		1,
@@ -28,13 +46,12 @@ func newLexer(codeString string) *Lexer {
 }
 
 func (lexerInstance *Lexer) updateCurrentCharacter() {
-	if (lexerInstance.currentCharacterIndex + 1) >= len(lexerInstance.codeString) {
-		lexerInstance.currentCharacter = 0
-	} else {
-		lexerInstance.currentCharacter = lexerInstance.codeString[lexerInstance.currentCharacterIndex+1]
+	if character, err := lexerInstance.fileReader.ReadByte(); err == nil {
+		lexerInstance.currentCharacter = character
+		return
 	}
 
-	lexerInstance.currentCharacterIndex += 1
+	lexerInstance.currentCharacter = 0
 }
 
 func (lexerInstance *Lexer) skipWhitespace() {
@@ -58,13 +75,14 @@ func (lexerInstance *Lexer) skipWhitespace() {
 }
 
 func (lexerInstance *Lexer) getMultiCharacterToken(isAllowedCharacter func(byte) bool) string {
-	startIndex := lexerInstance.currentCharacterIndex
+	var tokenSlice []byte
 
 	for isAllowedCharacter(lexerInstance.currentCharacter) {
+		tokenSlice = append(tokenSlice, lexerInstance.currentCharacter)
 		lexerInstance.updateCurrentCharacter()
 	}
 
-	return lexerInstance.codeString[startIndex:lexerInstance.currentCharacterIndex]
+	return string(tokenSlice)
 }
 
 func isLowerCase(character byte) bool {
@@ -99,6 +117,7 @@ func (lexerInstance *Lexer) handleWordToken(lineNumber int, columnNumber int) to
 	if _, isKeyword := keywords[word]; isKeyword {
 		return token{
 			kind:         word,
+			filePath:     lexerInstance.filePath,
 			lineNumber:   lineNumber,
 			columnNumber: columnNumber,
 		}
@@ -107,6 +126,7 @@ func (lexerInstance *Lexer) handleWordToken(lineNumber int, columnNumber int) to
 	return token{
 		identifier,
 		word,
+		lexerInstance.filePath,
 		lineNumber,
 		columnNumber,
 	}
@@ -120,6 +140,7 @@ func (lexerInstance *Lexer) handleNumberToken(lineNumber int, columnNumber int) 
 	return token{
 		integer,
 		number,
+		lexerInstance.filePath,
 		lineNumber,
 		columnNumber,
 	}
@@ -134,26 +155,40 @@ func (lexerInstance *Lexer) handleSingleCodePoint(character byte, lineNumber int
 
 	switch character {
 	case '=':
-		return token{kind: assign, lineNumber: lineNumber, columnNumber: columnNumber}
+		return token{kind: assign, filePath: lexerInstance.filePath, lineNumber: lineNumber, columnNumber: columnNumber}
 	case ',':
-		return token{kind: comma, lineNumber: lineNumber, columnNumber: columnNumber}
+		return token{kind: comma, filePath: lexerInstance.filePath, lineNumber: lineNumber, columnNumber: columnNumber}
 	case '{':
-		return token{kind: leftCurlyBrace, lineNumber: lineNumber, columnNumber: columnNumber}
+		return token{
+			kind: leftCurlyBrace, filePath: lexerInstance.filePath,
+			lineNumber: lineNumber, columnNumber: columnNumber,
+		}
 	case '(':
-		return token{kind: leftParenthesis, lineNumber: lineNumber, columnNumber: columnNumber}
+		return token{
+			kind: leftParenthesis, filePath: lexerInstance.filePath,
+			lineNumber: lineNumber, columnNumber: columnNumber,
+		}
 	case '+':
-		return token{kind: plus, lineNumber: lineNumber, columnNumber: columnNumber}
+		return token{kind: plus, filePath: lexerInstance.filePath, lineNumber: lineNumber, columnNumber: columnNumber}
 	case '}':
-		return token{kind: rightCurlyBrace, lineNumber: lineNumber, columnNumber: columnNumber}
+		return token{
+			kind: rightCurlyBrace, filePath: lexerInstance.filePath,
+			lineNumber: lineNumber, columnNumber: columnNumber,
+		}
 	case ')':
-		return token{kind: rightParenthesis, lineNumber: lineNumber, columnNumber: columnNumber}
+		return token{
+			kind: rightParenthesis, filePath: lexerInstance.filePath,
+			lineNumber: lineNumber, columnNumber: columnNumber,
+		}
 	case ';':
-		return token{kind: semicolon, lineNumber: lineNumber, columnNumber: columnNumber}
+		return token{kind: semicolon, filePath: lexerInstance.filePath, lineNumber: lineNumber, columnNumber: columnNumber}
 
 	case 0:
-		return token{kind: eof, lineNumber: lineNumber, columnNumber: columnNumber}
+		err := lexerInstance.file.Close()
+		check(err)
+		return token{kind: eof, filePath: lexerInstance.filePath, lineNumber: lineNumber, columnNumber: columnNumber}
 	default:
-		return token{unknown, string(character), lineNumber, columnNumber}
+		return token{unknown, string(character), lexerInstance.filePath, lineNumber, columnNumber}
 	}
 }
 

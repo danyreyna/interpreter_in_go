@@ -24,6 +24,7 @@ const (
 type token struct {
 	kind         string
 	literal      string
+	filePath     string
 	lineNumber   int
 	columnNumber int
 }
