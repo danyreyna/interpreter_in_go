@@ -3,34 +3,29 @@ package lexer
 import (
 	"bufio"
 	"interpreter_in_go/common"
-	"os"
+	"io"
 )
 
 type Lexer struct {
-	file                *os.File
-	fileReader          *bufio.Reader
+	reader              *bufio.Reader
 	filePath            string
 	currentCodePoint    rune
 	currentLineNumber   int
 	currentColumnNumber int
 }
 
-func newLexer(filePath string) *Lexer {
-	file, err := os.Open(filePath)
-	common.Check(err)
-
-	fileReader := bufio.NewReader(file)
+func newLexer(input io.Reader, filePath string) *Lexer {
+	reader := bufio.NewReader(input)
 
 	var currentCodePoint rune
-	if codePoint, _, err := fileReader.ReadRune(); err == nil {
+	if codePoint, _, err := reader.ReadRune(); err == nil {
 		currentCodePoint = codePoint
 	} else {
 		currentCodePoint = 0
 	}
 
 	lexerInstance := &Lexer{
-		file,
-		fileReader,
+		reader,
 		filePath,
 		currentCodePoint,
 		1,
@@ -41,7 +36,7 @@ func newLexer(filePath string) *Lexer {
 }
 
 func (lexerInstance *Lexer) updateCurrentCodePoint() {
-	if codePoint, _, err := lexerInstance.fileReader.ReadRune(); err == nil {
+	if codePoint, _, err := lexerInstance.reader.ReadRune(); err == nil {
 		lexerInstance.currentCodePoint = codePoint
 		return
 	}
@@ -50,10 +45,10 @@ func (lexerInstance *Lexer) updateCurrentCodePoint() {
 }
 
 func (lexerInstance *Lexer) peekAtNextCodePoint() rune {
-	codePoint, _, readErr := lexerInstance.fileReader.ReadRune()
+	codePoint, _, readErr := lexerInstance.reader.ReadRune()
 	common.Check(readErr)
 
-	unreadErr := lexerInstance.fileReader.UnreadRune()
+	unreadErr := lexerInstance.reader.UnreadRune()
 	common.Check(unreadErr)
 
 	return codePoint
@@ -216,8 +211,6 @@ func (lexerInstance *Lexer) handleSingleCodePoint(codePoint rune, lineNumber int
 		return token{kind: slash, filePath: lexerInstance.filePath, lineNumber: lineNumber, columnNumber: columnNumber}
 
 	case 0:
-		err := lexerInstance.file.Close()
-		common.Check(err)
 		return token{kind: eof, filePath: lexerInstance.filePath, lineNumber: lineNumber, columnNumber: columnNumber}
 	default:
 		return token{unknown, string(codePoint), lexerInstance.filePath, lineNumber, columnNumber}

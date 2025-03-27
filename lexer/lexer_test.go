@@ -1,6 +1,10 @@
 package lexer
 
-import "testing"
+import (
+	"interpreter_in_go/common"
+	"os"
+	"testing"
+)
 
 func TestGetNextToken(t *testing.T) {
 	tests := []struct {
@@ -104,7 +108,13 @@ func TestGetNextToken(t *testing.T) {
 		{eof, "", "./test-file.code", 24, 1},
 	}
 
-	lexerInstance := newLexer("./test-file.code")
+	filePath := "./test-file.code"
+
+	file, err := os.Open(filePath)
+	common.Check(err)
+	defer common.CloseFile(file)
+
+	lexerInstance := newLexer(file, filePath)
 
 	for i, currentTest := range tests {
 		currentToken := lexerInstance.getNextToken()
