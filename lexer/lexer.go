@@ -54,6 +54,16 @@ func (lexerInstance *Lexer) updateCurrentCodePoint() {
 	lexerInstance.currentCodePoint = 0
 }
 
+func (lexerInstance *Lexer) peekAtNextCodePoint() rune {
+	codePoint, _, readErr := lexerInstance.fileReader.ReadRune()
+	check(readErr)
+
+	unreadErr := lexerInstance.fileReader.UnreadRune()
+	check(unreadErr)
+
+	return codePoint
+}
+
 func (lexerInstance *Lexer) skipWhitespace() {
 	for lexerInstance.currentCodePoint == ' ' ||
 		lexerInstance.currentCodePoint == '\t' ||
@@ -100,13 +110,19 @@ func isPartOfWord(codePoint rune) bool {
 		'\n': {},
 		'\r': {},
 		'=':  {},
+		'*':  {},
+		'!':  {},
 		',':  {},
+		'>':  {},
 		'{':  {},
 		'(':  {},
+		'<':  {},
+		'-':  {},
 		'+':  {},
 		'}':  {},
 		')':  {},
 		';':  {},
+		'/':  {},
 		0:    {},
 	}
 
@@ -167,10 +183,12 @@ func (lexerInstance *Lexer) handleSingleCodePoint(codePoint rune, lineNumber int
 	}
 
 	switch codePoint {
-	case '=':
-		return token{kind: assign, filePath: lexerInstance.filePath, lineNumber: lineNumber, columnNumber: columnNumber}
+	case '*':
+		return token{kind: asterisk, filePath: lexerInstance.filePath, lineNumber: lineNumber, columnNumber: columnNumber}
 	case ',':
 		return token{kind: comma, filePath: lexerInstance.filePath, lineNumber: lineNumber, columnNumber: columnNumber}
+	case '>':
+		return token{kind: greaterThan, filePath: lexerInstance.filePath, lineNumber: lineNumber, columnNumber: columnNumber}
 	case '{':
 		return token{
 			kind: leftCurlyBrace, filePath: lexerInstance.filePath,
@@ -181,6 +199,10 @@ func (lexerInstance *Lexer) handleSingleCodePoint(codePoint rune, lineNumber int
 			kind: leftParenthesis, filePath: lexerInstance.filePath,
 			lineNumber: lineNumber, columnNumber: columnNumber,
 		}
+	case '<':
+		return token{kind: lessThan, filePath: lexerInstance.filePath, lineNumber: lineNumber, columnNumber: columnNumber}
+	case '-':
+		return token{kind: minus, filePath: lexerInstance.filePath, lineNumber: lineNumber, columnNumber: columnNumber}
 	case '+':
 		return token{kind: plus, filePath: lexerInstance.filePath, lineNumber: lineNumber, columnNumber: columnNumber}
 	case '}':
@@ -195,6 +217,8 @@ func (lexerInstance *Lexer) handleSingleCodePoint(codePoint rune, lineNumber int
 		}
 	case ';':
 		return token{kind: semicolon, filePath: lexerInstance.filePath, lineNumber: lineNumber, columnNumber: columnNumber}
+	case '/':
+		return token{kind: slash, filePath: lexerInstance.filePath, lineNumber: lineNumber, columnNumber: columnNumber}
 
 	case 0:
 		err := lexerInstance.file.Close()
@@ -203,6 +227,43 @@ func (lexerInstance *Lexer) handleSingleCodePoint(codePoint rune, lineNumber int
 	default:
 		return token{unknown, string(codePoint), lexerInstance.filePath, lineNumber, columnNumber}
 	}
+}
+
+func (lexerInstance *Lexer) handlePotentialDoubleCodePointToken(
+	expectedNextCodePoint rune,
+	singleTokenKind byte,
+	doubleTokenKind byte,
+	lineNumber int,
+	columnNumber int,
+) token {
+	if lexerInstance.peekAtNextCodePoint() == expectedNextCodePoint {
+		lexerInstance.currentColumnNumber += 2
+
+		lexerInstance.updateCurrentCodePoint()
+		lexerInstance.updateCurrentCodePoint()
+
+		return token{
+			kind: doubleTokenKind, filePath: lexerInstance.filePath,
+			lineNumber: lineNumber, columnNumber: columnNumber,
+		}
+	}
+
+	lexerInstance.currentColumnNumber += 1
+
+	lexerInstance.updateCurrentCodePoint()
+
+	return token{
+		kind: singleTokenKind, filePath: lexerInstance.filePath,
+		lineNumber: lineNumber, columnNumber: columnNumber,
+	}
+}
+
+func (lexerInstance *Lexer) handleExclamationMarkCodePoint(lineNumber int, columnNumber int) token {
+	return lexerInstance.handlePotentialDoubleCodePointToken('=', bang, inequality, lineNumber, columnNumber)
+}
+
+func (lexerInstance *Lexer) handleEqualsSignCodePoint(lineNumber int, columnNumber int) token {
+	return lexerInstance.handlePotentialDoubleCodePointToken('=', assign, equality, lineNumber, columnNumber)
 }
 
 func (lexerInstance *Lexer) getNextToken() token {
@@ -218,6 +279,14 @@ func (lexerInstance *Lexer) getNextToken() token {
 
 	if isNumeric(codePoint) {
 		return lexerInstance.handleNumberToken(lineNumber, columnNumber)
+	}
+
+	if codePoint == '!' {
+		return lexerInstance.handleExclamationMarkCodePoint(lineNumber, columnNumber)
+	}
+
+	if codePoint == '=' {
+		return lexerInstance.handleEqualsSignCodePoint(lineNumber, columnNumber)
 	}
 
 	return lexerInstance.handleSingleCodePoint(codePoint, lineNumber, columnNumber)
